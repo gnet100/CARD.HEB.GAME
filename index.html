@@ -3,12 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>משחק הזיכרון - גרסה יציבה</title>
+    <title>משחק הזיכרון שלי</title>
     <style>
         body { margin: 0; overflow: hidden; font-family: sans-serif; background: #e0f2f1; touch-action: none; }
         #menu, #victory { position: absolute; inset: 0; background: white; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; text-align: center; }
-        .option-group { margin: 10px; padding: 15px; border: 1px solid #ccc; border-radius: 10px; width: 80%; }
-        button { padding: 15px 25px; font-size: 1.2rem; cursor: pointer; border: none; border-radius: 8px; background: #26a69a; color: white; margin: 5px; }
+        .option-group { margin: 10px; padding: 15px; border: 1px solid #ccc; border-radius: 10px; width: 85%; max-width: 400px; }
+        
+        /* עיצוב כפתורי המהירות */
+        .speed-btn { padding: 12px 20px; font-size: 1.1rem; cursor: pointer; border: 2px solid #26a69a; border-radius: 8px; background: white; color: #26a69a; margin: 5px; transition: 0.2s; }
+        .speed-btn.selected { background: #26a69a; color: white; border-color: #004d40; box-shadow: inset 0 0 10px rgba(0,0,0,0.2); transform: scale(1.05); }
+        
+        button#start-btn { padding: 20px 40px; font-size: 1.4rem; cursor: pointer; border: none; border-radius: 10px; background: #00796b; color: white; margin-top: 20px; font-weight: bold; }
         .hidden { display: none !important; }
         canvas { display: block; background: #e0f2f1; }
     </style>
@@ -16,32 +21,32 @@
 <body>
 
 <div id="menu">
-    <h1>משחק הזיכרון שלי</h1>
+    <h1>משחק הזיכרון</h1>
+    
     <div class="option-group">
-        <p>מהירות:</p>
-        <button onclick="setSpeed(1.2)">צב</button>
-        <button onclick="setSpeed(2.2)">ארנב</button>
-        <button onclick="setSpeed(3.5)">צ'יטה</button>
+        <p><strong>בחר מהירות:</strong></p>
+        <button class="speed-btn" id="btn-slow" onclick="selectSpeed(1.2, 'btn-slow')">צב</button>
+        <button class="speed-btn selected" id="btn-med" onclick="selectSpeed(2.2, 'btn-med')">ארנב</button>
+        <button class="speed-btn" id="btn-fast" onclick="selectSpeed(3.5, 'btn-fast')">צ'יטה</button>
     </div>
+
     <div class="option-group">
-        <p>כמות זוגות (4-8): <span id="pairValue">5</span></p>
-        <input type="range" id="pairCount" min="4" max="8" value="5">
+        <p><strong>כמות זוגות (4-8):</strong> <span id="pairValue">5</span></p>
+        <input type="range" id="pairCount" min="4" max="8" value="5" style="width: 80%;">
     </div>
-    <div class="option-group">
-        <button id="toggleNikud" onclick="toggleNikud()">ניקוד: מופעל</button>
-    </div>
-    <button onclick="startGame()" style="background:#00796b;">התחל!</button>
+
+    <button id="start-btn" onclick="startGame()">התחל לשחק!</button>
 </div>
 
 <div id="victory" class="hidden">
     <h1>כל הכבוד! הצלחת! 🌟</h1>
-    <button onclick="location.reload()">שחק שוב</button>
+    <button onclick="location.reload()" style="padding:15px 30px; font-size:1.2rem; background:#26a69a; color:white; border:none; border-radius:8px;">שחק שוב</button>
 </div>
 
-<canvas id="gameCanvasV3"></canvas>
+<canvas id="gameCanvasV4"></canvas>
 
 <script>
-    const canvas = document.getElementById('gameCanvasV3');
+    const canvas = document.getElementById('gameCanvasV4');
     const ctx = canvas.getContext('2d');
     const pairInput = document.getElementById('pairCount');
     const pairValueDisplay = document.getElementById('pairValue');
@@ -49,41 +54,30 @@
 
     let speedMultiplier = 2.2;
     let maxPairs = 5;
-    let useNikud = true;
     let gameActive = false;
     let cards = [];
     let selectedFirst = null;
     let currentGoalPairs = 1;
     let isPausedForEffect = false;
-    const CARD_SIZE = 55; // גודל קטן וקבוע
+    const CARD_SIZE = 55;
 
     const cardData = [
-        { id: 'ant', nikud: 'נמלה', plain: 'נמלה' },
-        { id: 'baby', nikud: 'תִּינוק', plain: 'תינוק' },
-        { id: 'cake', nikud: 'עוגה', plain: 'עוגה' },
-        { id: 'cat', nikud: 'חתול', plain: 'חתול' },
-        { id: 'dog', nikud: 'כֶּלֶב', plain: 'כלב' },
-        { id: 'egg', nikud: 'בֵּיצָה', plain: 'ביצה' },
-        { id: 'fish', nikud: 'דג', plain: 'דג' },
-        { id: 'flower', nikud: 'פֶּרַח', plain: 'פרח' },
-        { id: 'foot', nikud: 'רגל', plain: 'רגל' },
-        { id: 'girl', nikud: 'ילדה', plain: 'ילדה' },
-        { id: 'hamster', nikud: 'אוגר', plain: 'אוגר' },
-        { id: 'hand', nikud: 'יד', plain: 'יד' },
-        { id: 'house', nikud: 'בַּית', plain: 'בית' },
-        { id: 'moon', nikud: 'ירח', plain: 'ירח' },
-        { id: 'fire', nikud: 'אשׁ', plain: 'אש' },
-        { id: 'sand', nikud: 'חול', plain: 'חול' },
-        { id: 'salt', nikud: 'מלח', plain: 'מלח' },
-        { id: 'spoon', nikud: 'כַּף', plain: 'כף' },
-        { id: 'star', nikud: 'כּוכָב', plain: 'כוכב' },
-        { id: 'sun', nikud: 'שׁמש', plain: 'שמש' }
+        { id: 'ant', text: 'נמלה' }, { id: 'baby', text: 'תִּינוק' },
+        { id: 'cake', text: 'עוגה' }, { id: 'cat', text: 'חתול' },
+        { id: 'dog', text: 'כֶּלֶב' }, { id: 'egg', text: 'בֵּיצָה' },
+        { id: 'fish', text: 'דג' }, { id: 'flower', text: 'פֶּרַח' },
+        { id: 'foot', text: 'רגל' }, { id: 'girl', text: 'ילדה' },
+        { id: 'hamster', text: 'אוגר' }, { id: 'hand', text: 'יד' },
+        { id: 'house', text: 'בַּית' }, { id: 'moon', text: 'ירח' },
+        { id: 'fire', text: 'אשׁ' }, { id: 'sand', text: 'חול' },
+        { id: 'salt', text: 'מלח' }, { id: 'spoon', text: 'כַּף' },
+        { id: 'star', text: 'כּוכָב' }, { id: 'sun', text: 'שׁמש' }
     ];
 
-    function setSpeed(s) { speedMultiplier = s; }
-    function toggleNikud() {
-        useNikud = !useNikud;
-        document.getElementById('toggleNikud').innerText = useNikud ? "ניקוד: מופעל" : "ניקוד: כבוי";
+    function selectSpeed(s, btnId) {
+        speedMultiplier = s;
+        document.querySelectorAll('.speed-btn').forEach(btn => btn.classList.remove('selected'));
+        document.getElementById(btnId).classList.add('selected');
     }
 
     class Card {
@@ -109,15 +103,21 @@
             ctx.save();
             ctx.globalAlpha = this.opacity;
             ctx.fillStyle = "white";
+            ctx.shadowBlur = 4;
+            ctx.shadowColor = "rgba(0,0,0,0.2)";
             ctx.beginPath();
-            ctx.roundRect(this.x, this.y, this.w, this.h, 6);
+            ctx.roundRect(this.x, this.y, this.w, this.h, 8);
             ctx.fill();
             if (this.selected) {
-                ctx.strokeStyle = "orange"; ctx.lineWidth = 3; ctx.stroke();
+                ctx.strokeStyle = "orange"; ctx.lineWidth = 4; ctx.stroke();
             }
             if (this.type === 'img') {
-                if (this.img && this.img.complete) {
-                    ctx.drawImage(this.img, this.x+4, this.y+4, this.w-8, this.h-8);
+                if (this.img && this.img.complete && this.img.naturalWidth !== 0) {
+                    ctx.drawImage(this.img, this.x+5, this.y+5, this.w-10, this.h-10);
+                } else {
+                    // גיבוי אם תמונה לא נמצאה - מציג ריבוע צבעוני עם האות הראשונה של השם
+                    ctx.fillStyle = "#ddd";
+                    ctx.fillRect(this.x+5, this.y+5, this.w-10, this.h-10);
                 }
             } else {
                 ctx.fillStyle = "black"; ctx.font = "bold 13px Arial"; ctx.textAlign = "center";
@@ -129,10 +129,8 @@
         update() {
             if (this.selected || this.blinking || isPausedForEffect) return;
             this.x += this.vx; this.y += this.vy;
-            if (this.x <= 0) { this.x = 0; this.vx *= -1; }
-            if (this.x + this.w >= canvas.width) { this.x = canvas.width - this.w; this.vx *= -1; }
-            if (this.y <= 0) { this.y = 0; this.vy *= -1; }
-            if (this.y + this.h >= canvas.height) { this.y = canvas.height - this.h; this.vy *= -1; }
+            if (this.x <= 0 || this.x + this.w >= canvas.width) this.vx *= -1;
+            if (this.y <= 0 || this.y + this.h >= canvas.height) this.vy *= -1;
         }
     }
 
@@ -142,26 +140,16 @@
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
         gameActive = true;
+        currentGoalPairs = 1;
         addPairs(1);
         requestAnimationFrame(gameLoop);
     }
 
-    function getSafeRandomPos() {
-        let x, y, overlap;
-        let attempts = 0;
-        do {
-            overlap = false;
-            x = Math.random() * (canvas.width - CARD_SIZE);
-            y = Math.random() * (canvas.height - CARD_SIZE);
-            for (let card of cards) {
-                if (Math.abs(x - card.x) < CARD_SIZE + 10 && Math.abs(y - card.y) < CARD_SIZE + 10) {
-                    overlap = true;
-                    break;
-                }
-            }
-            attempts++;
-        } while (overlap && attempts < 50);
-        return {x, y};
+    function getSafePos() {
+        return {
+            x: Math.random() * (canvas.width - CARD_SIZE),
+            y: Math.random() * (canvas.height - CARD_SIZE)
+        };
     }
 
     function addPairs(n) {
@@ -169,11 +157,9 @@
         const selected = shuffled.slice(0, n);
         cards = [];
         selected.forEach(data => {
-            const text = useNikud ? data.nikud : data.plain;
-            let posImg = getSafeRandomPos();
-            cards.push(new Card(null, 'img', data.id, posImg.x, posImg.y));
-            let posTxt = getSafeRandomPos();
-            cards.push(new Card(text, 'txt', data.id, posTxt.x, posTxt.y));
+            let p1 = getSafePos(), p2 = getSafePos();
+            cards.push(new Card(null, 'img', data.id, p1.x, p1.y));
+            cards.push(new Card(data.text, 'txt', data.id, p2.x, p2.y));
         });
     }
 
@@ -181,17 +167,14 @@
         if (!gameActive) return;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
+        // התנגשויות
         for (let i = 0; i < cards.length; i++) {
             for (let j = i + 1; j < cards.length; j++) {
                 let c1 = cards[i], c2 = cards[j];
-                let dx = (c1.x + c1.w/2) - (c2.x + c2.w/2);
-                let dy = (c1.y + c1.h/2) - (c2.y + c2.h/2);
-                let dist = Math.sqrt(dx*dx + dy*dy);
+                let dist = Math.hypot((c1.x - c2.x), (c1.y - c2.y));
                 if (dist < CARD_SIZE) {
                     [c1.vx, c2.vx] = [c2.vx, c1.vx];
                     [c1.vy, c2.vy] = [c2.vy, c1.vy];
-                    // הזזה קלה למניעת הידבקות
-                    c1.x += c1.vx; c1.y += c1.vy;
                 }
             }
         }
@@ -200,17 +183,14 @@
         requestAnimationFrame(gameLoop);
     }
 
-    const inputEvent = 'ontouchstart' in window ? 'touchstart' : 'mousedown';
-    canvas.addEventListener(inputEvent, (e) => {
+    const input = 'ontouchstart' in window ? 'touchstart' : 'mousedown';
+    canvas.addEventListener(input, (e) => {
         if (isPausedForEffect) return;
-        e.preventDefault();
         const rect = canvas.getBoundingClientRect();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        const x = clientX - rect.left;
-        const y = clientY - rect.top;
+        const cx = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+        const cy = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
 
-        const clicked = cards.find(c => x > c.x && x < c.x + c.w && y > c.y && y < c.y + c.h);
+        const clicked = cards.find(c => cx > c.x && cx < c.x+c.w && cy > c.y && cy < c.y+c.h);
         if (!clicked || clicked.blinking) return;
 
         if (!selectedFirst) {
@@ -225,32 +205,26 @@
                 selectedFirst.selected = false; selectedFirst = null;
             }
         }
-    }, {passive: false});
+    });
 
     function successMatch(c1, c2) {
         isPausedForEffect = true;
         c1.blinking = true; c2.blinking = true;
-        let blinkCount = 0;
-        const interval = setInterval(() => {
-            c1.opacity = (c1.opacity === 1) ? 0.2 : 1;
+        let count = 0;
+        const blink = setInterval(() => {
+            c1.opacity = c1.opacity === 1 ? 0.2 : 1;
             c2.opacity = c1.opacity;
-            blinkCount++;
-            if (blinkCount > 6) {
-                clearInterval(interval);
+            if (++count > 6) {
+                clearInterval(blink);
                 cards = cards.filter(c => c !== c1 && c !== c2);
                 selectedFirst = null;
                 isPausedForEffect = false;
                 if (cards.length === 0) {
-                    if (currentGoalPairs < maxPairs) {
-                        currentGoalPairs++;
-                        addPairs(currentGoalPairs);
-                    } else {
-                        document.getElementById('victory').classList.remove('hidden');
-                        gameActive = false;
-                    }
+                    if (currentGoalPairs < maxPairs) addPairs(++currentGoalPairs);
+                    else { document.getElementById('victory').classList.remove('hidden'); gameActive = false; }
                 }
             }
-        }, 400); 
+        }, 400);
     }
 </script>
 </body>
