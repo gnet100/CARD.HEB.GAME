@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>משחק זיכרון בתנועה</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #e0f2f1; touch-action: none; }
+        #menu, #victory { position: absolute; inset: 0; background: rgba(255,255,255,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; text-align: center; }
+        .option-group { margin: 10px; background: #fff; padding: 15px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 85%; max-width: 400px; }
+        h1 { color: #00796b; margin-bottom: 10px; }
+        button { padding: 12px 24px; font-size: 1.1rem; cursor: pointer; border: none; border-radius: 8px; background: #26a69a; color: white; margin: 5px; transition: transform 0.1s; }
+        button:active { transform: scale(0.95); }
+        input[type=range] { width: 80%; }
+        .hidden { display: none !important; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+
+<div id="menu">
+    <h1>משחק הזיכרון שלי</h1>
+    <div class="option-group">
+        <p><strong>מהירות:</strong></p>
+        <button onclick="setSpeed(1.2)">צב</button>
+        <button onclick="setSpeed(2.5)">ארנב</button>
+        <button onclick="setSpeed(4.5)">צ'יטה</button>
+    </div>
+    <div class="option-group">
+        <p><strong>כמות זוגות מקסימלית:</strong> <span id="pairValue">5</span></p>
+        <input type="range" id="pairCount" min="4" max="8" value="5">
+    </div>
+    <div class="option-group">
+        <button id="toggleNikud" onclick="toggleNikud()" style="background:#795548">ניקוד: מופעל</button>
+    </div>
+    <button onclick="startGame()" style="background:#00897b; font-weight:bold; padding: 20px 40px;">התחל לשחק!</button>
+</div>
+
+<div id="victory" class="hidden">
+    <h1>כל הכבוד! הצלחת הכל! 🌟</h1>
+    <button onclick="location.reload()">שחק שוב</button>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const pairInput = document.getElementById('pairCount');
+    const pairValueDisplay = document.getElementById('pairValue');
+    
+    pairInput.oninput = () => pairValueDisplay.innerText = pairInput.value;
+
+    let speedMultiplier = 2.5;
+    let maxPairs = 5;
+    let useNikud = true;
+    let gameActive = false;
+    let cards = [];
+    let selectedFirst = null;
+    let currentGoalPairs = 1;
+
+    // רשימה מעודכנת לפי בקשתך: בכ"פ בלבד, ללא דגש ב-ד', SALT ו-SAND
+    const cardData = [
+        { id: 'ant', nikud: 'נמלה', plain: 'נמלה' },
+        { id: 'baby', nikud: 'תִּינוק', plain: 'תינוק' },
+        { id: 'cake', nikud: 'עוגה', plain: 'עוגה' },
+        { id: 'cat', nikud: 'חתול', plain: 'חתול' },
+        { id: 'dog', nikud: 'כֶּלֶב', plain: 'כלב' },
+        { id: 'egg', nikud: 'בֵּיצָה', plain: 'ביצה' },
+        { id: 'fish', nikud: 'דג', plain: 'דג' },
+        { id: 'flower', nikud: 'פֶּרַח', plain: 'פרח' },
+        { id: 'foot', nikud: 'רגל', plain: 'רגל' },
+        { id: 'girl', nikud: 'ילדה', plain: 'ילדה' },
+        { id: 'hamster', nikud: 'אוגר', plain: 'אוגר' },
+        { id: 'hand', nikud: 'יד', plain: 'יד' },
+        { id: 'house', nikud: 'בַּית', plain: 'בית' },
+        { id: 'moon', nikud: 'ירח', plain: 'ירח' },
+        { id: 'fire', nikud: 'אשׁ', plain: 'אש' },
+        { id: 'sand', nikud: 'חול', plain: 'חול' },
+        { id: 'salt', nikud: 'מלח', plain: 'מלח' },
+        { id: 'spoon', nikud: 'כַּף', plain: 'כף' },
+        { id: 'star', nikud: 'כּוכָב', plain: 'כוכב' },
+        { id: 'sun', nikud: 'שׁמש', plain: 'שמש' }
+    ];
+
+    function setSpeed(s) { speedMultiplier = s; }
+    function toggleNikud() {
+        useNikud = !useNikud;
+        document.getElementById('toggleNikud').innerText = useNikud ? "ניקוד: מופעל" : "ניקוד: כבוי";
+    }
+
+    class Card {
+        constructor(content, type, matchId, x, y) {
+            this.content = content; 
+            this.type = type; 
+            this.matchId = matchId;
+            this.x = x;
+            this.y = y;
+            this.w = 110;
+            this.h = 110;
+            this.vx = (Math.random() - 0.5) * speedMultiplier * 2;
+            this.vy = (Math.random() - 0.5) * speedMultiplier * 2;
+            this.selected = false;
+            this.blinking = false;
+            this.opacity = 1;
+            this.img = null;
+
+            if (this.type === 'img') {
+                this.img = new Image();
+                this.img.src = `${this.matchId}.png`;
+            }
+        }
+
+        draw() {
+            ctx.save();
+            ctx.globalAlpha = this.opacity;
+            ctx.fillStyle = "white";
+            ctx.shadowBlur = this.selected ? 15 : 5;
+            ctx.shadowColor = this.selected ? "#00bcd4" : "rgba(0,0,0,0.2)";
+            
+            // Draw Card Body
+            ctx.beginPath();
+            ctx.roundRect(this.x, this.y, this.w, this.h, 12);
+            ctx.fill();
+            
+            if (this.selected) {
+                ctx.strokeStyle = "#00bcd4";
+                ctx.lineWidth = 4;
+                ctx.stroke();
+            }
+
+            if (this.type === 'img') {
+                if (this.img.complete) {
+                    ctx.drawImage(this.img, this.x + 10, this.y + 10, this.w - 20, this.h - 20);
+                }
+            } else {
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = "#333";
+                ctx.font = "bold 22px Arial";
+                ctx.textAlign = "center";
+                ctx.fillText(this.content, this.x + this.w / 2, this.y + this.h / 2 + 8);
+            }
+            ctx.restore();
+        }
+
+        update() {
+            if (this.selected || this.blinking) return;
+            this.x += this.vx;
+            this.y += this.vy;
+
+            if (this.x <= 0 || this.x + this.w >= canvas.width) this.vx *= -1;
+            if (this.y <= 0 || this.y + this.h >= canvas.height) this.vy *= -1;
+        }
+    }
+
+    function startGame() {
+        maxPairs = parseInt(pairInput.value);
+        document.getElementById('menu').classList.add('hidden');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        gameActive = true;
+        addPairs(1);
+        requestAnimationFrame(gameLoop);
+    }
+
+    function addPairs(n) {
+        // בחירת מילים אקראיות ללא חזרות באותו שלב
+        const shuffled = [...cardData].sort(() => 0.5 - Math.random());
+        const selected = shuffled.slice(0, n);
+        
+        cards = [];
+        selected.forEach(data => {
+            const text = useNikud ? data.nikud : data.plain;
+            cards.push(new Card(null, 'img', data.id, Math.random() * (canvas.width-120), Math.random() * (canvas.height-120)));
+            cards.push(new Card(text, 'txt', data.id, Math.random() * (canvas.width-120), Math.random() * (canvas.height-120)));
+        });
+    }
+
+    function gameLoop() {
+        if (!gameActive) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Physics: Bounce off each other
+        for (let i = 0; i < cards.length; i++) {
+            for (let j = i + 1; j < cards.length; j++) {
+                let c1 = cards[i], c2 = cards[j];
+                if (Math.abs(c1.x - c2.x) < c1.w && Math.abs(c1.y - c2.y) < c1.h) {
+                    [c1.vx, c2.vx] = [c2.vx, c1.vx];
+                    [c1.vy, c2.vy] = [c2.vy, c1.vy];
+                }
+            }
+        }
+
+        cards.forEach(card => {
+            card.update();
+            card.draw();
+        });
+        requestAnimationFrame(gameLoop);
+    }
+
+    const inputEvent = 'ontouchstart' in window ? 'touchstart' : 'mousedown';
+    canvas.addEventListener(inputEvent, (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const x = clientX - rect.left;
+        const y = clientY - rect.top;
+
+        const clickedCard = cards.find(c => x > c.x && x < c.x + c.w && y > c.y && y < c.y + c.h);
+        if (!clickedCard || clickedCard.blinking) return;
+
+        if (!selectedFirst) {
+            selectedFirst = clickedCard;
+            clickedCard.selected = true;
+        } else if (selectedFirst === clickedCard) {
+            selectedFirst.selected = false;
+            selectedFirst = null;
+        } else {
+            if (selectedFirst.matchId === clickedCard.matchId && selectedFirst.type !== clickedCard.type) {
+                clickedCard.selected = true;
+                successMatch(selectedFirst, clickedCard);
+            } else {
+                selectedFirst.selected = false;
+                selectedFirst = null;
+                // כאן אפשר להוסיף צליל טעות
+            }
+        }
+    });
+
+    function successMatch(c1, c2) {
+        c1.blinking = true; c2.blinking = true;
+        let blinkCount = 0;
+        const interval = setInterval(() => {
+            c1.opacity = c1.opacity === 1 ? 0.2 : 1;
+            c2.opacity = c1.opacity;
+            blinkCount++;
+            if (blinkCount > 6) {
+                clearInterval(interval);
+                cards = cards.filter(c => c !== c1 && c !== c2);
+                selectedFirst = null;
+                
+                if (cards.length === 0) {
+                    if (currentGoalPairs < maxPairs) {
+                        currentGoalPairs++;
+                        addPairs(currentGoalPairs);
+                    } else {
+                        document.getElementById('victory').classList.remove('hidden');
+                        gameActive = false;
+                    }
+                }
+            }
+        }, 150);
+    }
+</script>
+</body>
+</html>
