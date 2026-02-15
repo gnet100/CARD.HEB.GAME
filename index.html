@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>משחק הזיכרון - כרטיסיות קטנות</title>
+    <title>משחק הזיכרון - גרסה יציבה</title>
     <style>
         body { margin: 0; overflow: hidden; font-family: sans-serif; background: #e0f2f1; touch-action: none; }
         #menu, #victory { position: absolute; inset: 0; background: white; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; text-align: center; }
@@ -20,8 +20,8 @@
     <div class="option-group">
         <p>מהירות:</p>
         <button onclick="setSpeed(1.2)">צב</button>
-        <button onclick="setSpeed(2.5)">ארנב</button>
-        <button onclick="setSpeed(4.5)">צ'יטה</button>
+        <button onclick="setSpeed(2.2)">ארנב</button>
+        <button onclick="setSpeed(3.5)">צ'יטה</button>
     </div>
     <div class="option-group">
         <p>כמות זוגות (4-8): <span id="pairValue">5</span></p>
@@ -38,16 +38,16 @@
     <button onclick="location.reload()">שחק שוב</button>
 </div>
 
-<canvas id="gameCanvas"></canvas>
+<canvas id="gameCanvasV3"></canvas>
 
 <script>
-    const canvas = document.getElementById('gameCanvas');
+    const canvas = document.getElementById('gameCanvasV3');
     const ctx = canvas.getContext('2d');
     const pairInput = document.getElementById('pairCount');
     const pairValueDisplay = document.getElementById('pairValue');
     pairInput.oninput = () => pairValueDisplay.innerText = pairInput.value;
 
-    let speedMultiplier = 2.5;
+    let speedMultiplier = 2.2;
     let maxPairs = 5;
     let useNikud = true;
     let gameActive = false;
@@ -55,6 +55,7 @@
     let selectedFirst = null;
     let currentGoalPairs = 1;
     let isPausedForEffect = false;
+    const CARD_SIZE = 55; // גודל קטן וקבוע
 
     const cardData = [
         { id: 'ant', nikud: 'נמלה', plain: 'נמלה' },
@@ -74,4 +75,183 @@
         { id: 'fire', nikud: 'אשׁ', plain: 'אש' },
         { id: 'sand', nikud: 'חול', plain: 'חול' },
         { id: 'salt', nikud: 'מלח', plain: 'מלח' },
-        { id: 'spoon', nikud:
+        { id: 'spoon', nikud: 'כַּף', plain: 'כף' },
+        { id: 'star', nikud: 'כּוכָב', plain: 'כוכב' },
+        { id: 'sun', nikud: 'שׁמש', plain: 'שמש' }
+    ];
+
+    function setSpeed(s) { speedMultiplier = s; }
+    function toggleNikud() {
+        useNikud = !useNikud;
+        document.getElementById('toggleNikud').innerText = useNikud ? "ניקוד: מופעל" : "ניקוד: כבוי";
+    }
+
+    class Card {
+        constructor(content, type, matchId, x, y) {
+            this.content = content; 
+            this.type = type; 
+            this.matchId = matchId;
+            this.x = x; this.y = y;
+            this.w = CARD_SIZE; this.h = CARD_SIZE;
+            this.vx = (Math.random() * 2 - 1) * speedMultiplier;
+            this.vy = (Math.random() * 2 - 1) * speedMultiplier;
+            this.selected = false;
+            this.blinking = false;
+            this.opacity = 1;
+            this.img = null;
+            if (this.type === 'img') {
+                this.img = new Image();
+                this.img.src = `${this.matchId}.png`;
+            }
+        }
+
+        draw() {
+            ctx.save();
+            ctx.globalAlpha = this.opacity;
+            ctx.fillStyle = "white";
+            ctx.beginPath();
+            ctx.roundRect(this.x, this.y, this.w, this.h, 6);
+            ctx.fill();
+            if (this.selected) {
+                ctx.strokeStyle = "orange"; ctx.lineWidth = 3; ctx.stroke();
+            }
+            if (this.type === 'img') {
+                if (this.img && this.img.complete) {
+                    ctx.drawImage(this.img, this.x+4, this.y+4, this.w-8, this.h-8);
+                }
+            } else {
+                ctx.fillStyle = "black"; ctx.font = "bold 13px Arial"; ctx.textAlign = "center";
+                ctx.fillText(this.content, this.x + this.w/2, this.y + this.h/2 + 5);
+            }
+            ctx.restore();
+        }
+
+        update() {
+            if (this.selected || this.blinking || isPausedForEffect) return;
+            this.x += this.vx; this.y += this.vy;
+            if (this.x <= 0) { this.x = 0; this.vx *= -1; }
+            if (this.x + this.w >= canvas.width) { this.x = canvas.width - this.w; this.vx *= -1; }
+            if (this.y <= 0) { this.y = 0; this.vy *= -1; }
+            if (this.y + this.h >= canvas.height) { this.y = canvas.height - this.h; this.vy *= -1; }
+        }
+    }
+
+    function startGame() {
+        maxPairs = parseInt(pairInput.value);
+        document.getElementById('menu').classList.add('hidden');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        gameActive = true;
+        addPairs(1);
+        requestAnimationFrame(gameLoop);
+    }
+
+    function getSafeRandomPos() {
+        let x, y, overlap;
+        let attempts = 0;
+        do {
+            overlap = false;
+            x = Math.random() * (canvas.width - CARD_SIZE);
+            y = Math.random() * (canvas.height - CARD_SIZE);
+            for (let card of cards) {
+                if (Math.abs(x - card.x) < CARD_SIZE + 10 && Math.abs(y - card.y) < CARD_SIZE + 10) {
+                    overlap = true;
+                    break;
+                }
+            }
+            attempts++;
+        } while (overlap && attempts < 50);
+        return {x, y};
+    }
+
+    function addPairs(n) {
+        const shuffled = [...cardData].sort(() => 0.5 - Math.random());
+        const selected = shuffled.slice(0, n);
+        cards = [];
+        selected.forEach(data => {
+            const text = useNikud ? data.nikud : data.plain;
+            let posImg = getSafeRandomPos();
+            cards.push(new Card(null, 'img', data.id, posImg.x, posImg.y));
+            let posTxt = getSafeRandomPos();
+            cards.push(new Card(text, 'txt', data.id, posTxt.x, posTxt.y));
+        });
+    }
+
+    function gameLoop() {
+        if (!gameActive) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        for (let i = 0; i < cards.length; i++) {
+            for (let j = i + 1; j < cards.length; j++) {
+                let c1 = cards[i], c2 = cards[j];
+                let dx = (c1.x + c1.w/2) - (c2.x + c2.w/2);
+                let dy = (c1.y + c1.h/2) - (c2.y + c2.h/2);
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < CARD_SIZE) {
+                    [c1.vx, c2.vx] = [c2.vx, c1.vx];
+                    [c1.vy, c2.vy] = [c2.vy, c1.vy];
+                    // הזזה קלה למניעת הידבקות
+                    c1.x += c1.vx; c1.y += c1.vy;
+                }
+            }
+        }
+
+        cards.forEach(card => { card.update(); card.draw(); });
+        requestAnimationFrame(gameLoop);
+    }
+
+    const inputEvent = 'ontouchstart' in window ? 'touchstart' : 'mousedown';
+    canvas.addEventListener(inputEvent, (e) => {
+        if (isPausedForEffect) return;
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const x = clientX - rect.left;
+        const y = clientY - rect.top;
+
+        const clicked = cards.find(c => x > c.x && x < c.x + c.w && y > c.y && y < c.y + c.h);
+        if (!clicked || clicked.blinking) return;
+
+        if (!selectedFirst) {
+            selectedFirst = clicked; clicked.selected = true;
+        } else if (selectedFirst === clicked) {
+            clicked.selected = false; selectedFirst = null;
+        } else {
+            if (selectedFirst.matchId === clicked.matchId && selectedFirst.type !== clicked.type) {
+                clicked.selected = true;
+                successMatch(selectedFirst, clicked);
+            } else {
+                selectedFirst.selected = false; selectedFirst = null;
+            }
+        }
+    }, {passive: false});
+
+    function successMatch(c1, c2) {
+        isPausedForEffect = true;
+        c1.blinking = true; c2.blinking = true;
+        let blinkCount = 0;
+        const interval = setInterval(() => {
+            c1.opacity = (c1.opacity === 1) ? 0.2 : 1;
+            c2.opacity = c1.opacity;
+            blinkCount++;
+            if (blinkCount > 6) {
+                clearInterval(interval);
+                cards = cards.filter(c => c !== c1 && c !== c2);
+                selectedFirst = null;
+                isPausedForEffect = false;
+                if (cards.length === 0) {
+                    if (currentGoalPairs < maxPairs) {
+                        currentGoalPairs++;
+                        addPairs(currentGoalPairs);
+                    } else {
+                        document.getElementById('victory').classList.remove('hidden');
+                        gameActive = false;
+                    }
+                }
+            }
+        }, 400); 
+    }
+</script>
+</body>
+</html>
