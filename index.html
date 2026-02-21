@@ -3,58 +3,59 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>משחק הזיכרון שלי</title>
+    <title>משחק הזיכרון</title>
     <style>
         body { margin: 0; overflow: hidden; font-family: sans-serif; background: #e0f2f1; touch-action: none; }
         #menu, #victory { position: absolute; inset: 0; background: white; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; text-align: center; }
-        .option-group { margin: 10px; padding: 15px; border: 1px solid #ccc; border-radius: 10px; width: 85%; max-width: 350px; }
+        .option-group { margin: 10px; padding: 15px; border: 1px solid #ccc; border-radius: 15px; width: 85%; max-width: 350px; background: #f9f9f9; }
         
-        /* עיצוב כפתורי המהירות עם הדגשה חזקה */
-        .speed-btn { padding: 12px 20px; font-size: 1.1rem; cursor: pointer; border: 2px solid #26a69a; border-radius: 8px; background: white; color: #26a69a; margin: 5px; width: 80px; font-weight: bold; }
-        .speed-btn.selected { background: #004d40; color: white; border-color: #002d20; box-shadow: 0 0 10px rgba(0,0,0,0.3); transform: scale(1.1); }
+        .speed-btn { padding: 12px 18px; font-size: 1.1rem; cursor: pointer; border: 2px solid #26a69a; border-radius: 10px; background: white; color: #26a69a; margin: 5px; min-width: 80px; font-weight: bold; transition: 0.3s; }
+        /* הדגשה חזקה לכפתור שנבחר */
+        .speed-btn.selected { background: #004d40; color: white; border-color: #002d20; transform: scale(1.1); box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
         
-        #start-btn { padding: 18px 45px; font-size: 1.5rem; cursor: pointer; border: none; border-radius: 50px; background: #00796b; color: white; margin-top: 20px; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        #start-btn { padding: 18px 50px; font-size: 1.5rem; cursor: pointer; border: none; border-radius: 50px; background: #00796b; color: white; margin-top: 25px; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
         .hidden { display: none !important; }
-        canvas { display: block; background: #e0f2f1; }
+        canvas { display: block; }
     </style>
 </head>
 <body>
 
 <div id="menu">
-    <h1 style="color:#004d40">משחק הזיכרון</h1>
+    <h1 style="color:#00796b; margin-bottom: 5px;">משחק הזיכרון</h1>
     
     <div class="option-group">
-        <p style="margin-top:0"><strong>בחר מהירות:</strong></p>
+        <p style="margin-top:0; color:#555;"><strong>בחר מהירות תנועה:</strong></p>
         <div style="display:flex; justify-content:center; gap:5px;">
             <button class="speed-btn" id="btn-slow" onclick="selectSpeed(1, 'btn-slow')">צב</button>
-            <button class="speed-btn selected" id="btn-med" onclick="selectSpeed(2, 'btn-med')">ארנב</button>
-            <button class="speed-btn" id="btn-fast" onclick="selectSpeed(3.2, 'btn-fast')">צ'יטה</button>
+            <button class="speed-btn selected" id="btn-med" onclick="selectSpeed(2.2, 'btn-med')">ארנב</button>
+            <button class="speed-btn" id="btn-fast" onclick="selectSpeed(4, 'btn-fast')">צ'יטה</button>
         </div>
     </div>
 
     <div class="option-group">
-        <p style="margin-top:0"><strong>כמות זוגות (4-8):</strong> <span id="pairValue" style="color:#00796b; font-weight:bold;">5</span></p>
-        <input type="range" id="pairCount" min="4" max="8" value="5" style="width: 90%;">
+        <p style="margin-top:0; color:#555;"><strong>כמות זוגות (4-8):</strong> <span id="pairValue" style="color:#00796b; font-weight:bold;">5</span></p>
+        <input type="range" id="pairCount" min="4" max="8" value="5" style="width: 90%; cursor: pointer;">
     </div>
 
-    <button id="start-btn" onclick="startGame()">התחל!</button>
+    <button id="start-btn" onclick="startGame()">התחל לשחק!</button>
 </div>
 
 <div id="victory" class="hidden">
-    <h1>כל הכבוד! הצלחת! 🌟</h1>
-    <button onclick="location.reload()" style="padding:15px 30px; background:#26a69a; color:white; border:none; border-radius:10px;">שחק שוב</button>
+    <h1 style="font-size: 2.5rem;">כל הכבוד! 🌟</h1>
+    <p style="font-size: 1.2rem;">ניצחת את המשחק!</p>
+    <button onclick="location.reload()" style="padding:15px 40px; background:#26a69a; color:white; border:none; border-radius:10px; font-size:1.2rem;">שחק שוב</button>
 </div>
 
-<canvas id="gameCanvasVFinal"></canvas>
+<canvas id="gameCanvas"></canvas>
 
 <script>
-    const canvas = document.getElementById('gameCanvasVFinal');
+    const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const pairInput = document.getElementById('pairCount');
     const pairValueDisplay = document.getElementById('pairValue');
     pairInput.oninput = () => pairValueDisplay.innerText = pairInput.value;
 
-    let speedMultiplier = 2;
+    let speedMultiplier = 2.2;
     let maxPairs = 5;
     let gameActive = false;
     let cards = [];
@@ -63,6 +64,7 @@
     let isPausedForEffect = false;
     const CARD_SIZE = 55;
 
+    // המילים המנוקדות (בכ"פ בלבד) כפי שסיכמנו
     const cardData = [
         { id: 'ant', text: 'נמלה' }, { id: 'baby', text: 'תִּינוק' },
         { id: 'cake', text: 'עוגה' }, { id: 'cat', text: 'חתול' },
@@ -90,47 +92,39 @@
             this.w = CARD_SIZE; this.h = CARD_SIZE;
             this.x = Math.random() * (canvas.width - this.w);
             this.y = Math.random() * (canvas.height - this.h);
-            this.vx = (Math.random() - 0.5) * speedMultiplier * 2;
-            this.vy = (Math.random() - 0.5) * speedMultiplier * 2;
+            this.vx = (Math.random() - 0.5) * speedMultiplier * 2.5;
+            this.vy = (Math.random() - 0.5) * speedMultiplier * 2.5;
             this.selected = false;
             this.blinking = false;
             this.opacity = 1;
             this.img = null;
             if (this.type === 'img') {
                 this.img = new Image();
-                this.img.src = this.matchId + '.png';
-            }
+		this.img.src = 'images/' + this.matchId + '.png'; 
+           }
         }
 
         draw() {
             ctx.save();
             ctx.globalAlpha = this.opacity;
             ctx.fillStyle = "white";
+            ctx.shadowBlur = 4;
+            ctx.shadowColor = "rgba(0,0,0,0.15)";
             ctx.beginPath();
             ctx.roundRect(this.x, this.y, this.w, this.h, 10);
             ctx.fill();
-            
             if (this.selected) {
-                ctx.strokeStyle = "#ff9800";
-                ctx.lineWidth = 4;
-                ctx.stroke();
+                ctx.strokeStyle = "#ff9800"; ctx.lineWidth = 4; ctx.stroke();
             }
-
             if (this.type === 'img') {
                 if (this.img && this.img.complete && this.img.naturalWidth !== 0) {
                     ctx.drawImage(this.img, this.x + 6, this.y + 6, this.w - 12, this.h - 12);
                 } else {
-                    // אם התמונה לא נטענה, מציג ריבוע צבעוני כדי שהמשחק לא יתקע
-                    ctx.fillStyle = "#e0e0e0";
-                    ctx.fillRect(this.x + 6, this.y + 6, this.w - 12, this.h - 12);
-                    ctx.fillStyle = "#999";
-                    ctx.font = "10px Arial";
-                    ctx.fillText("?", this.x + this.w/2 - 3, this.y + this.h/2 + 4);
+                    ctx.fillStyle = "#f0f0f0";
+                    ctx.fillRect(this.x+6, this.y+6, this.w-12, this.h-12);
                 }
             } else {
-                ctx.fillStyle = "#333";
-                ctx.font = "bold 13px Arial";
-                ctx.textAlign = "center";
+                ctx.fillStyle = "#333"; ctx.font = "bold 13px Arial"; ctx.textAlign = "center";
                 ctx.fillText(this.content, this.x + this.w / 2, this.y + this.h / 2 + 5);
             }
             ctx.restore();
@@ -150,7 +144,6 @@
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
         gameActive = true;
-        currentGoalPairs = 1;
         addPairs(1);
         requestAnimationFrame(gameLoop);
     }
@@ -168,19 +161,15 @@
     function gameLoop() {
         if (!gameActive) return;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // פיזיקה בסיסית של התנגשות
         for (let i = 0; i < cards.length; i++) {
             for (let j = i + 1; j < cards.length; j++) {
                 let c1 = cards[i], c2 = cards[j];
                 let dist = Math.hypot(c1.x - c2.x, c1.y - c2.y);
                 if (dist < CARD_SIZE) {
-                    [c1.vx, c2.vx] = [c2.vx, c1.vx];
-                    [c1.vy, c2.vy] = [c2.vy, c1.vy];
+                    [c1.vx, c2.vx] = [c2.vx, c1.vx]; [c1.vy, c2.vy] = [c2.vy, c1.vy];
                 }
             }
         }
-
         cards.forEach(card => { card.update(); card.draw(); });
         requestAnimationFrame(gameLoop);
     }
@@ -192,22 +181,19 @@
         const cx = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
         const cy = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
         const clicked = cards.find(c => cx > c.x && cx < c.x + c.w && cy > c.y && cy < c.y + c.h);
-        
         if (!clicked || clicked.blinking) return;
-
         if (!selectedFirst) {
             selectedFirst = clicked; clicked.selected = true;
         } else if (selectedFirst === clicked) {
             clicked.selected = false; selectedFirst = null;
         } else {
             if (selectedFirst.matchId === clicked.matchId && selectedFirst.type !== clicked.type) {
-                clicked.selected = true;
-                successMatch(selectedFirst, clicked);
+                clicked.selected = true; successMatch(selectedFirst, clicked);
             } else {
                 selectedFirst.selected = false; selectedFirst = null;
             }
         }
-    });
+    }, {passive: false});
 
     function successMatch(c1, c2) {
         isPausedForEffect = true;
